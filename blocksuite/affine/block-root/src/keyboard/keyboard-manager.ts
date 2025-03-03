@@ -17,10 +17,11 @@ import {
   type UIEventHandler,
 } from '@blocksuite/block-std';
 import { IS_MAC, IS_WINDOWS } from '@blocksuite/global/env';
+import { toDraftModel } from '@blocksuite/store';
 
 export class PageKeyboardManager {
   private readonly _handleDelete: UIEventHandler = ctx => {
-    const event = ctx.get('keyboardState').raw;
+    const event = ctx.get('defaultState').event;
     const blockSelections = this._currentSelection.filter(sel =>
       sel.is(BlockSelection)
     );
@@ -143,7 +144,9 @@ export class PageKeyboardManager {
     }
 
     const doc = rootComponent.host.doc;
-    const autofill = getTitleFromSelectedModels(selectedModels);
+    const autofill = getTitleFromSelectedModels(
+      selectedModels.map(toDraftModel)
+    );
     promptDocTitle(rootComponent.std, autofill)
       .then(title => {
         if (title === null) return;

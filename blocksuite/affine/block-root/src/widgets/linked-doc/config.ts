@@ -55,15 +55,15 @@ export interface LinkedWidgetConfig {
    *
    * If the return value is not null, no action will be taken.
    */
-  autoFocusedItem?: (
+  autoFocusedItemKey?: (
     menus: LinkedMenuGroup[],
     query: string,
+    currentActiveKey: string | null,
     editorHost: EditorHost,
     inlineEditor: AffineInlineEditor
-  ) => LinkedMenuItem | null;
+  ) => string | null;
 
   mobile: {
-    useScreenHeight?: boolean;
     /**
      * The linked doc menu widget will scroll the container to make sure the input cursor is visible in viewport.
      * It accepts a selector string, HTMLElement or Window
@@ -101,8 +101,6 @@ export type LinkedMenuGroup = {
   loading?: boolean | Signal<boolean>;
   // copywriting when display quantity exceeds
   overflowText?: string | Signal<string>;
-  // loading text
-  loadingText?: string | Signal<string>;
 };
 
 export type LinkedDocContext = {
@@ -233,6 +231,7 @@ export function createNewDocMenuGroup(
           };
           showImportModal({
             collection: doc.workspace,
+            schema: doc.schema,
             onSuccess,
             onFail,
           });

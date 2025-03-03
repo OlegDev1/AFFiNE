@@ -1,17 +1,22 @@
 import { Container, type ServiceProvider } from '@blocksuite/global/di';
 import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
 import { type Disposable, Slot } from '@blocksuite/global/utils';
-import { signal } from '@preact/signals-core';
+import { computed, signal } from '@preact/signals-core';
 
 import type { ExtensionType } from '../../extension/extension.js';
-import { StoreSelectionExtension } from '../../extension/index.js';
-import type { Schema } from '../../schema/index.js';
+import {
+  BlockSchemaIdentifier,
+  StoreExtensionIdentifier,
+  StoreSelectionExtension,
+} from '../../extension/index.js';
+import { Schema } from '../../schema/index.js';
+import type { TransformerMiddleware } from '../../transformer/middleware.js';
+import { Transformer } from '../../transformer/transformer.js';
 import {
   Block,
   type BlockModel,
   type BlockOptions,
   type BlockProps,
-  type DraftModel,
 } from '../block/index.js';
 import type { Doc } from '../doc.js';
 import { DocCRUD } from './crud.js';
@@ -20,7 +25,6 @@ import { type Query, runQuery } from './query.js';
 import { syncBlockProps } from './utils.js';
 
 export type StoreOptions = {
-  schema: Schema;
   doc: Doc;
   id?: string;
   readonly?: boolean;
@@ -54,6 +58,10 @@ export class Store {
   };
 
   private readonly _readonly = signal(false);
+
+  private readonly _isEmpty = computed(() => {
+    return this.root?.isEmpty() ?? true;
+  });
 
   private readonly _schema: Schema;
 
@@ -92,10 +100,10 @@ export class Store {
   };
 
   updateBlock: {
-    <T extends Partial<BlockProps>>(model: BlockModel, props: T): void;
-    (model: BlockModel, callback: () => void): void;
+    <T extends Partial<BlockProps>>(model: BlockModel | string, props: T): void;
+    (model: BlockModel | string, callback: () => void): void;
   } = (
-    model: BlockModel,
+    modelOrId: BlockModel | string,
     callBackOrProps: (() => void) | Partial<BlockProps>
   ) => {
     if (this.readonly) {
@@ -104,6 +112,17 @@ export class Store {
     }
 
     const isCallback = typeof callBackOrProps === 'function';
+
+    const model =
+      typeof modelOrId === 'string'
+        ? this.getBlock(modelOrId)?.model
+        : modelOrId;
+    if (!model) {
+      throw new BlockSuiteError(
+        ErrorCode.ModelCRUDError,
+        `updating block: ${modelOrId} not found`
+      );
+    }
 
     if (!isCallback) {
       const parent = this.getParent(model);
@@ -215,7 +234,11 @@ export class Store {
   }
 
   get isEmpty() {
-    return this.root?.isEmpty() ?? true;
+    return this._isEmpty.peek();
+  }
+
+  get isEmpty$() {
+    return this._isEmpty;
   }
 
   get loaded() {
@@ -290,14 +313,18 @@ export class Store {
     return this._doc.withoutTransact.bind(this._doc);
   }
 
-  constructor({
-    schema,
-    doc,
-    readonly,
-    query,
-    provider,
-    extensions,
-  }: StoreOptions) {
+  constructor({ doc, readonly, query, provider, extensions }: StoreOptions) {
+    this._doc = doc;
+    this.slots = {
+      ready: new Slot(),
+      rootAdded: new Slot(),
+      rootDeleted: new Slot(),
+      blockUpdated: new Slot(),
+      historyUpdated: this._doc.slots.historyUpdated,
+      yBlockUpdated: this._doc.slots.yBlockUpdated,
+    };
+    this._schema = new Schema();
+
     const container = new Container();
     container.addImpl(StoreIdentifier, () => this);
 
@@ -312,19 +339,10 @@ export class Store {
     });
 
     this._provider = container.provider(undefined, provider);
-    this._doc = doc;
-
-    this.slots = {
-      ready: new Slot(),
-      rootAdded: new Slot(),
-      rootDeleted: new Slot(),
-      blockUpdated: new Slot(),
-      historyUpdated: this._doc.slots.historyUpdated,
-      yBlockUpdated: this._doc.slots.yBlockUpdated,
-    };
-
-    this._crud = new DocCRUD(this._yBlocks, doc.schema);
-    this._schema = schema;
+    this._provider.getAll(BlockSchemaIdentifier).forEach(schema => {
+      this._schema.register([schema]);
+    });
+    this._crud = new DocCRUD(this._yBlocks, this._schema);
     if (readonly !== undefined) {
       this._readonly.value = readonly;
     }
@@ -541,7 +559,7 @@ export class Store {
   }
 
   deleteBlock(
-    model: DraftModel,
+    model: BlockModel | string,
     options: {
       bringChildrenTo?: BlockModel;
       deleteChildren?: boolean;
@@ -567,7 +585,10 @@ export class Store {
     };
 
     this.transact(() => {
-      this._crud.deleteBlock(model.id, opts);
+      this._crud.deleteBlock(
+        typeof model === 'string' ? model : model.id,
+        opts
+      );
     });
   }
 
@@ -677,6 +698,7 @@ export class Store {
 
   load(initFn?: () => void) {
     this._doc.load(initFn);
+    this._provider.getAll(StoreExtensionIdentifier);
     this.slots.ready.emit();
     return this;
   }
@@ -708,5 +730,18 @@ export class Store {
 
   get getOptional() {
     return this.provider.getOptional.bind(this.provider);
+  }
+
+  getTransformer(middlewares: TransformerMiddleware[] = []) {
+    return new Transformer({
+      schema: this.schema,
+      blobCRUD: this.workspace.blobSync,
+      docCRUD: {
+        create: (id: string) => this.workspace.createDoc({ id }),
+        get: (id: string) => this.workspace.getDoc(id),
+        delete: (id: string) => this.workspace.removeDoc(id),
+      },
+      middlewares,
+    });
   }
 }

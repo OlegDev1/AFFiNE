@@ -34,7 +34,6 @@ import {
   titleMiddleware,
 } from '@blocksuite/affine/blocks';
 import { Container } from '@blocksuite/affine/global/di';
-import { Transformer } from '@blocksuite/affine/store';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Keyboard } from '@capacitor/keyboard';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -98,15 +97,48 @@ framework.impl(ClientSchemeProvider, {
 });
 
 framework.impl(VirtualKeyboardProvider, {
-  addEventListener: (event, callback) => {
-    Keyboard.addListener(event as any, callback as any).catch(e => {
-      console.error(e);
+  show: () => {
+    Keyboard.show().catch(console.error);
+  },
+  hide: () => {
+    // In some cases, the keyboard will show again. for example, it will show again
+    // when this function is called in click event of button. It may be a bug of
+    // android webview or capacitor.
+    setTimeout(() => {
+      Keyboard.hide().catch(console.error);
     });
   },
-  removeAllListeners: () => {
-    Keyboard.removeAllListeners().catch(e => {
-      console.error(e);
-    });
+  onChange: callback => {
+    let disposeRef = {
+      dispose: () => {},
+    };
+
+    Promise.all([
+      Keyboard.addListener('keyboardWillShow', info => {
+        callback({
+          visible: true,
+          height: info.keyboardHeight,
+        });
+      }),
+      Keyboard.addListener('keyboardWillHide', () => {
+        callback({
+          visible: false,
+          height: 0,
+        });
+      }),
+    ])
+      .then(handlers => {
+        disposeRef.dispose = () => {
+          Promise.all(handlers.map(handler => handler.remove())).catch(
+            console.error
+          );
+        };
+      })
+      .catch(console.error);
+
+    return () => {
+      disposeRef.dispose();
+    };
   },
 });
 
@@ -165,19 +197,10 @@ framework.impl(AIButtonProvider, {
   try {
     const blockSuiteDoc = doc.blockSuiteDoc;
 
-    const transformer = new Transformer({
-      schema: blockSuiteDoc.workspace.schema,
-      blobCRUD: blockSuiteDoc.workspace.blobSync,
-      docCRUD: {
-        create: (id: string) => blockSuiteDoc.workspace.createDoc({ id }),
-        get: (id: string) => blockSuiteDoc.workspace.getDoc(id),
-        delete: (id: string) => blockSuiteDoc.workspace.removeDoc(id),
-      },
-      middlewares: [
-        docLinkBaseURLMiddleware(blockSuiteDoc.workspace.id),
-        titleMiddleware(blockSuiteDoc.workspace.meta.docMetas),
-      ],
-    });
+    const transformer = blockSuiteDoc.getTransformer([
+      docLinkBaseURLMiddleware(blockSuiteDoc.workspace.id),
+      titleMiddleware(blockSuiteDoc.workspace.meta.docMetas),
+    ]);
     const snapshot = transformer.docToSnapshot(blockSuiteDoc);
 
     const container = new Container();

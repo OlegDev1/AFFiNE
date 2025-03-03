@@ -180,14 +180,16 @@ export class TableCell extends SignalWatcher(
                 name: 'Insert Left',
                 prefix: InsertLeftIcon(),
                 select: () => {
-                  this.dataManager.insertColumn(columnIndex - 1);
+                  this.dataManager.insertColumn(
+                    columnIndex > 0 ? columnIndex - 1 : undefined
+                  );
                 },
               }),
               menu.action({
                 name: 'Insert Right',
                 prefix: InsertRightIcon(),
                 select: () => {
-                  this.dataManager.insertColumn(columnIndex + 1);
+                  this.dataManager.insertColumn(columnIndex);
                 },
               }),
               menu.action({
@@ -304,14 +306,16 @@ export class TableCell extends SignalWatcher(
                 name: 'Insert Above',
                 prefix: InsertAboveIcon(),
                 select: () => {
-                  this.dataManager.insertRow(rowIndex - 1);
+                  this.dataManager.insertRow(
+                    rowIndex > 0 ? rowIndex - 1 : undefined
+                  );
                 },
               }),
               menu.action({
                 name: 'Insert Below',
                 prefix: InsertBelowIcon(),
                 select: () => {
-                  this.dataManager.insertRow(rowIndex + 1);
+                  this.dataManager.insertRow(rowIndex);
                 },
               }),
               menu.action({
@@ -454,6 +458,7 @@ export class TableCell extends SignalWatcher(
     };
     return html`<div class=${columnOptionsCellStyle}>
       <div
+        data-testid="drag-column-handle"
         data-drag-column-id=${column.columnId}
         class=${classMap({
           [columnOptionsStyle]: true,
@@ -478,6 +483,7 @@ export class TableCell extends SignalWatcher(
     };
     return html`<div class=${rowOptionsCellStyle}>
       <div
+        data-testid="drag-row-handle"
         data-drag-row-id=${row.rowId}
         class=${classMap({
           [rowOptionsStyle]: true,

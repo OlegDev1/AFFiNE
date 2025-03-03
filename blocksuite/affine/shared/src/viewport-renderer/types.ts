@@ -32,3 +32,18 @@ export interface TextRect {
   rect: Rect;
   text: string;
 }
+
+/**
+ * Represents the rendering state of the ViewportTurboRenderer
+ * - inactive: Renderer is not active
+ * - pending: Bitmap is invalid or not yet available, falling back to DOM rendering
+ * - zooming: Zooming in or out, will use fast canvas placeholder rendering
+ * - rendering: Currently rendering to a bitmap (async operation in progress)
+ * - ready: Bitmap is valid and rendered, DOM elements can be safely removed
+ */
+export type RenderingState =
+  | 'inactive'
+  | 'pending'
+  | 'zooming'
+  | 'rendering'
+  | 'ready';

@@ -19,6 +19,7 @@ import {
 import { configureFindInPageModule } from '@affine/core/modules/find-in-page';
 import { GlobalContextService } from '@affine/core/modules/global-context';
 import { I18nProvider } from '@affine/core/modules/i18n';
+import { JournalService } from '@affine/core/modules/journal';
 import { LifecycleService } from '@affine/core/modules/lifecycle';
 import {
   configureElectronStateStorageImpls,
@@ -141,12 +142,7 @@ window.addEventListener('unload', () => {
     .catch(console.error);
 });
 
-events?.applicationMenu.openAboutPageInSettingModal(() =>
-  frameworkProvider.get(WorkspaceDialogService).open('setting', {
-    activeTab: 'about',
-  })
-);
-events?.applicationMenu.onNewPageAction(() => {
+function getCurrentWorkspace() {
   const currentWorkspaceId = frameworkProvider
     .get(GlobalContextService)
     .globalContext.workspaceId.get();
@@ -158,6 +154,31 @@ events?.applicationMenu.onNewPageAction(() => {
     return;
   }
   const { workspace, dispose } = workspaceRef;
+
+  return {
+    workspace,
+    dispose,
+  };
+}
+
+events?.applicationMenu.openAboutPageInSettingModal(() => {
+  const currentWorkspace = getCurrentWorkspace();
+  if (!currentWorkspace) {
+    return;
+  }
+  const { workspace, dispose } = currentWorkspace;
+  workspace.scope.get(WorkspaceDialogService).open('setting', {
+    activeTab: 'about',
+  });
+  dispose();
+});
+
+events?.applicationMenu.onNewPageAction(type => {
+  const currentWorkspace = getCurrentWorkspace();
+  if (!currentWorkspace) {
+    return;
+  }
+  const { workspace, dispose } = currentWorkspace;
   const editorSettingService = frameworkProvider.get(EditorSettingService);
   const docsService = workspace.scope.get(DocsService);
   const editorSetting = editorSettingService.editorSetting;
@@ -171,12 +192,27 @@ events?.applicationMenu.onNewPageAction(() => {
       if (!isActive) {
         return;
       }
-      const page = docsService.createDoc({ docProps });
+      const page = docsService.createDoc({ docProps, primaryMode: type });
       workspace.scope.get(WorkbenchService).workbench.openDoc(page.id);
     })
     .catch(err => {
       console.error(err);
     });
+
+  dispose();
+});
+
+events?.applicationMenu.onOpenJournal(() => {
+  const currentWorkspace = getCurrentWorkspace();
+  if (!currentWorkspace) {
+    return;
+  }
+  const { workspace, dispose } = currentWorkspace;
+
+  const workbench = workspace.scope.get(WorkbenchService).workbench;
+  const journalService = workspace.scope.get(JournalService);
+  const docId = journalService.ensureJournalByDate(new Date()).id;
+  workbench.openDoc(docId);
 
   dispose();
 });

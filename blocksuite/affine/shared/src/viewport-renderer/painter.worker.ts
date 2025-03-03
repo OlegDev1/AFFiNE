@@ -8,6 +8,7 @@ type WorkerMessagePaint = {
     height: number;
     dpr: number;
     zoom: number;
+    version: number;
   };
 };
 
@@ -25,6 +26,8 @@ const font = new FontFace(
 );
 // @ts-expect-error worker env
 self.fonts && self.fonts.add(font);
+
+const debugSentenceBoarder = false;
 
 function getBaseline() {
   const fontSize = 15;
@@ -59,11 +62,9 @@ class LayoutPainter {
   private clearBackground() {
     if (!this.canvas || !this.ctx) return;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.fillStyle = 'white';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  paint(layout: ViewportLayout) {
+  paint(layout: ViewportLayout, version: number) {
     const { canvas, ctx } = this;
     if (!canvas || !ctx) return;
     if (layout.rect.w === 0 || layout.rect.h === 0) {
@@ -93,7 +94,9 @@ class LayoutPainter {
           // Only render if we haven't rendered at this position before
           if (renderedPositions.has(posKey)) return;
 
-          ctx.strokeRect(x, y, textRect.rect.w, textRect.rect.h);
+          if (debugSentenceBoarder) {
+            ctx.strokeRect(x, y, textRect.rect.w, textRect.rect.h);
+          }
           ctx.fillStyle = 'black';
           ctx.fillText(textRect.text, x, y + baselineY);
 
@@ -103,7 +106,10 @@ class LayoutPainter {
     });
 
     const bitmap = canvas.transferToImageBitmap();
-    self.postMessage({ type: 'bitmapPainted', bitmap }, { transfer: [bitmap] });
+    self.postMessage(
+      { type: 'bitmapPainted', bitmap, version },
+      { transfer: [bitmap] }
+    );
   }
 }
 
@@ -127,9 +133,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
   switch (type) {
     case 'paintLayout': {
-      const { layout, width, height, dpr, zoom } = data;
+      const { layout, width, height, dpr, zoom, version } = data;
       painter.setSize(width, height, dpr, zoom);
-      painter.paint(layout);
+      painter.paint(layout, version);
       break;
     }
   }

@@ -21,15 +21,24 @@ export type PerplexityConfig = {
   endpoint?: string;
 };
 
-const PerplexityErrorSchema = z.object({
-  detail: z.array(
-    z.object({
-      loc: z.array(z.string()),
-      msg: z.string(),
+const PerplexityErrorSchema = z.union([
+  z.object({
+    detail: z.array(
+      z.object({
+        loc: z.array(z.string()),
+        msg: z.string(),
+        type: z.string(),
+      })
+    ),
+  }),
+  z.object({
+    error: z.object({
+      message: z.string(),
       type: z.string(),
-    })
-  ),
-});
+      code: z.number(),
+    }),
+  }),
+]);
 
 const PerplexityDataSchema = z.object({
   citations: z.array(z.string()),
@@ -49,6 +58,8 @@ const PerplexityDataSchema = z.object({
 });
 
 const PerplexitySchema = z.union([PerplexityDataSchema, PerplexityErrorSchema]);
+
+type PerplexityError = z.infer<typeof PerplexityErrorSchema>;
 
 export class CitationParser {
   private readonly SQUARE_BRACKET_OPEN = '[';
@@ -187,7 +198,7 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
 
   async generateText(
     messages: PromptMessage[],
-    model: string = 'llama-3.1-sonar-small-128k-online',
+    model: string = 'sonar',
     options: CopilotChatOptions = {}
   ): Promise<string> {
     await this.checkParams({ messages, model, options });
@@ -214,18 +225,15 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
         params
       );
       const data = PerplexitySchema.parse(await response.json());
-      if ('detail' in data) {
-        throw new CopilotProviderSideError({
-          provider: this.type,
-          kind: 'unexpected_response',
-          message: data.detail[0].msg || 'Unexpected perplexity response',
-        });
+      if ('detail' in data || 'error' in data) {
+        throw this.convertError(data);
       } else {
-        const parser = new CitationParser();
+        const citationParser = new CitationParser();
         const { content } = data.choices[0].message;
         const { citations } = data;
-        let result = parser.parse(content, citations);
-        result += parser.end();
+        let result = content.replaceAll(/<\/?think>\n/g, '\n---\n');
+        result = citationParser.parse(result, citations);
+        result += citationParser.end();
         return result;
       }
     } catch (e: any) {
@@ -236,7 +244,7 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
 
   async *generateTextStream(
     messages: PromptMessage[],
-    model: string = 'llama-3.1-sonar-small-128k-online',
+    model: string = 'sonar',
     options: CopilotChatOptions = {}
   ): AsyncIterable<string> {
     await this.checkParams({ messages, model, options });
@@ -263,9 +271,9 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
         this.config.endpoint || 'https://api.perplexity.ai/chat/completions',
         params
       );
-      if (response.body) {
-        const parser = new CitationParser();
-        const provider = this.type;
+      const errorHandler = this.convertError;
+      if (response.ok && response.body) {
+        const citationParser = new CitationParser();
         const eventStream = response.body
           .pipeThrough(new TextDecoderStream())
           .pipeThrough(new EventSourceParserStream())
@@ -279,22 +287,18 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
                 const json = JSON.parse(chunk.data);
                 if (json) {
                   const data = PerplexitySchema.parse(json);
-                  if ('detail' in data) {
-                    throw new CopilotProviderSideError({
-                      provider,
-                      kind: 'unexpected_response',
-                      message:
-                        data.detail[0].msg || 'Unexpected perplexity response',
-                    });
+                  if ('detail' in data || 'error' in data) {
+                    throw errorHandler(data);
                   }
                   const { content } = data.choices[0].delta;
                   const { citations } = data;
-                  const result = parser.parse(content, citations);
+                  let result = content.replaceAll(/<\/?think>\n?/g, '\n---\n');
+                  result = citationParser.parse(result, citations);
                   controller.enqueue(result);
                 }
               },
               flush(controller) {
-                controller.enqueue(parser.end());
+                controller.enqueue(citationParser.end());
                 controller.enqueue(null);
               },
             })
@@ -327,6 +331,24 @@ export class PerplexityProvider implements CopilotTextToTextProvider {
     if (!(await this.isModelAvailable(model))) {
       throw new CopilotPromptInvalid(`Invalid model: ${model}`);
     }
+  }
+
+  private convertError(e: PerplexityError) {
+    function getErrMessage(e: PerplexityError) {
+      let err = 'Unexpected perplexity response';
+      if ('detail' in e) {
+        err = e.detail[0].msg || err;
+      } else if ('error' in e) {
+        err = e.error.message || err;
+      }
+      return err;
+    }
+
+    throw new CopilotProviderSideError({
+      provider: this.type,
+      kind: 'unexpected_response',
+      message: getErrMessage(e),
+    });
   }
 
   private handleError(e: any) {

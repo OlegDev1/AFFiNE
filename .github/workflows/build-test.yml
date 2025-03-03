@@ -309,6 +309,10 @@ jobs:
         with:
           workspace-copy: true
           drive-size: 8GB
+          drive-format: NTFS
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+            RUSTUP_HOME,{{ DEV_DRIVE }}/.rustup
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
         with:
@@ -386,6 +390,28 @@ jobs:
           name: web
           path: dist.tar.gz
           if-no-files-found: error
+
+  native-unit-test:
+    name: Native Unit Test
+    runs-on: ubuntu-latest
+    needs:
+      - optimize_ci
+      - build-native
+    if: needs.optimize_ci.outputs.skip == 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          extra-flags: workspaces focus @affine-tools/cli @affine/monorepo @affine/native
+          electron-install: false
+      - name: Download affine.linux-x64-gnu.node
+        uses: actions/download-artifact@v4
+        with:
+          name: affine.linux-x64-gnu.node
+          path: ./packages/frontend/native
+      - name: Unit Test
+        run: yarn affine @affine/native test
 
   server-test:
     name: Server Test
@@ -897,6 +923,7 @@ jobs:
       - build-native
       - build-server-native
       - build-electron-renderer
+      - native-unit-test
       - server-test
       - rust-test
       - copilot-api-test

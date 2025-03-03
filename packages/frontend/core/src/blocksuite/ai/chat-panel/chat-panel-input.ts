@@ -203,8 +203,6 @@ export class ChatPanelInput extends SignalWatcher(WithDisposable(LitElement)) {
   @property({ attribute: false })
   accessor networkSearchConfig!: AINetworkSearchConfig;
 
-  private _lastPromptName: string | null = null;
-
   private get _isNetworkActive() {
     return (
       !!this.networkSearchConfig.visible.value &&
@@ -230,12 +228,9 @@ export class ChatPanelInput extends SignalWatcher(WithDisposable(LitElement)) {
   }
 
   private async _updatePromptName(promptName: string) {
-    if (this._lastPromptName !== promptName) {
-      const sessionId = await this.getSessionId();
-      if (sessionId && AIProvider.session) {
-        await AIProvider.session.updateSession(sessionId, promptName);
-        this._lastPromptName = promptName;
-      }
+    const sessionId = await this.getSessionId();
+    if (sessionId && AIProvider.session) {
+      await AIProvider.session.updateSession(sessionId, promptName);
     }
   }
 
@@ -303,9 +298,11 @@ export class ChatPanelInput extends SignalWatcher(WithDisposable(LitElement)) {
       <div
         class="chat-panel-input"
         @pointerdown=${(e: MouseEvent) => {
-          // by default the div will be focused and will blur the textarea
-          e.preventDefault();
-          this.textarea.focus();
+          if (e.target !== this.textarea) {
+            // by default the div will be focused and will blur the textarea
+            e.preventDefault();
+            this.textarea.focus();
+          }
         }}
       >
         ${hasImages

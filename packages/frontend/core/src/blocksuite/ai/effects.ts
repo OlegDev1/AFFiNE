@@ -1,3 +1,5 @@
+import { SpecProvider } from '@blocksuite/affine/blocks';
+
 import { AIChatBlockComponent } from './blocks/ai-chat-block/ai-chat-block';
 import { EdgelessAIChatBlockComponent } from './blocks/ai-chat-block/ai-chat-edgeless-block';
 import {
@@ -10,6 +12,7 @@ import {
 } from './blocks/ai-chat-block/components/chat-images';
 import { ImagePlaceholder } from './blocks/ai-chat-block/components/image-placeholder';
 import { UserInfo } from './blocks/ai-chat-block/components/user-info';
+import { AIChatBlockSchemaExtension } from './blocks/ai-chat-block/model';
 import { ChatPanel } from './chat-panel';
 import { ActionWrapper } from './chat-panel/actions/action-wrapper';
 import { ChatText } from './chat-panel/actions/chat-text';
@@ -28,6 +31,7 @@ import { ChatPanelChip } from './chat-panel/components/chip';
 import { ChatPanelDocChip } from './chat-panel/components/doc-chip';
 import { ChatPanelFileChip } from './chat-panel/components/file-chip';
 import { effects as componentAiItemEffects } from './components/ai-item';
+import { AIScrollableTextRenderer } from './components/ai-scrollable-text-renderer';
 import { AskAIButton } from './components/ask-ai-button';
 import { AskAIIcon } from './components/ask-ai-icon';
 import { AskAIPanel } from './components/ask-ai-panel';
@@ -104,6 +108,10 @@ export function registerAIEffects() {
   customElements.define('affine-ai-chat', AIChatBlockComponent);
   customElements.define('ai-chat-message', AIChatMessage);
   customElements.define('ai-chat-messages', AIChatMessages);
+  customElements.define(
+    'ai-scrollable-text-renderer',
+    AIScrollableTextRenderer
+  );
   customElements.define('image-placeholder', ImagePlaceholder);
   customElements.define('chat-image', ChatImage);
   customElements.define('chat-images', ChatImages);
@@ -126,4 +134,6 @@ export function registerAIEffects() {
     'edgeless-copilot-toolbar-entry',
     EdgelessCopilotToolbarEntry
   );
+
+  SpecProvider._.extendSpec('store', [AIChatBlockSchemaExtension]);
 }

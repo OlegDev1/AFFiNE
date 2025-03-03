@@ -116,7 +116,6 @@ const bookmarkFlavours = new Set([
 
 const markdownPreviewDocCollection = new WorkspaceImpl({
   id: 'indexer',
-  schema: blocksuiteSchema,
 });
 
 function generateMarkdownPreviewBuilder(
@@ -148,7 +147,7 @@ function generateMarkdownPreviewBuilder(
       keys: Array.from(yblock.keys())
         .filter(key => key.startsWith('prop:'))
         .map(key => key.substring(5)),
-    };
+    } as DraftModel;
   }
 
   const titleMiddleware: TransformerMiddleware = ({ adapterConfigs }) => {
@@ -190,7 +189,7 @@ function generateMarkdownPreviewBuilder(
   const provider = container.provider();
   const markdownAdapter = new MarkdownAdapter(
     new Transformer({
-      schema: markdownPreviewDocCollection.schema,
+      schema: getAFFiNEWorkspaceSchema(),
       blobCRUD: markdownPreviewDocCollection.blobSync,
       docCRUD: {
         create: (id: string) => markdownPreviewDocCollection.createDoc({ id }),

@@ -1,3 +1,4 @@
+import { BlockSchemaExtension } from '@blocksuite/store';
 import { z } from 'zod';
 
 import {
@@ -51,3 +52,7 @@ export const EmbedLinkedDocBlockSchema = createEmbedBlockSchema({
   toModel: () => new EmbedLinkedDocModel(),
   props: (): EmbedLinkedDocBlockProps => defaultEmbedLinkedDocBlockProps,
 });
+
+export const EmbedLinkedDocBlockSchemaExtension = BlockSchemaExtension(
+  EmbedLinkedDocBlockSchema
+);

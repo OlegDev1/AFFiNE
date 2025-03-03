@@ -6,16 +6,12 @@ import {
   ShadowlessElement,
 } from '@blocksuite/affine/block-std';
 import {
-  CodeBlockComponent,
   codeBlockWrapMiddleware,
   defaultBlockMarkdownAdapterMatchers,
   defaultImageProxyMiddleware,
-  DividerBlockComponent,
   InlineDeltaToMarkdownAdapterExtensions,
-  ListBlockComponent,
   MarkdownInlineToDeltaAdapterExtensions,
   PageEditorBlockSpecs,
-  ParagraphBlockComponent,
 } from '@blocksuite/affine/blocks';
 import { Container, type ServiceProvider } from '@blocksuite/affine/global/di';
 import { WithDisposable } from '@blocksuite/affine/global/utils';
@@ -38,13 +34,6 @@ import type {
   AffineAIPanelState,
   AffineAIPanelWidgetConfig,
 } from '../widgets/ai-panel/type';
-
-const textBlockStyles = css`
-  ${ParagraphBlockComponent.styles}
-  ${ListBlockComponent.styles}
-  ${DividerBlockComponent.styles}
-  ${CodeBlockComponent.styles}
-`;
 
 const customHeadingStyles = css`
   .custom-heading {
@@ -88,7 +77,6 @@ const customHeadingStyles = css`
 `;
 
 export type TextRendererOptions = {
-  maxHeight?: number;
   customHeading?: boolean;
   extensions?: ExtensionType[];
   additionalMiddlewares?: TransformerMiddleware[];
@@ -179,11 +167,12 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
       }
     }
 
-    ${textBlockStyles}
     ${customHeadingStyles}
   `;
 
   private _answers: string[] = [];
+
+  private _maxContainerHeight = 0;
 
   private readonly _clearTimer = () => {
     if (this._timer) {
@@ -205,6 +194,7 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
       'affine:code',
       'affine:list',
       'affine:divider',
+      'affine:latex',
     ].map(flavour => ({ flavour, viewType: 'display' })),
   };
 
@@ -214,7 +204,7 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
     if (this._answers.length > 0) {
       const latestAnswer = this._answers.pop();
       this._answers = [];
-      const schema = this.schema ?? this.host?.std.store.workspace.schema;
+      const schema = this.schema ?? this.host?.std.store.schema;
       let provider: ServiceProvider;
       if (this.host) {
         provider = this.host.std.provider;
@@ -256,13 +246,6 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
     }
   };
 
-  private _onWheel(e: MouseEvent) {
-    e.stopPropagation();
-    if (this.state === 'generating') {
-      e.preventDefault();
-    }
-  }
-
   override connectedCallback() {
     super.connectedCallback();
     this._answers.push(this.answer);
@@ -289,19 +272,13 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
       return nothing;
     }
 
-    const { maxHeight, customHeading } = this.options;
+    const { customHeading } = this.options;
     const classes = classMap({
       'text-renderer-container': true,
-      'show-scrollbar': !!maxHeight,
       'custom-heading': !!customHeading,
     });
     return html`
-      <style>
-        .text-renderer-container {
-          max-height: ${maxHeight ? Math.max(maxHeight, 200) + 'px' : ''};
-        }
-      </style>
-      <div class=${classes} @wheel=${this._onWheel}>
+      <div class=${classes}>
         ${keyed(
           this._doc,
           html`<div class="ai-answer-text-editor affine-page-viewport">
@@ -328,7 +305,15 @@ export class TextRenderer extends WithDisposable(ShadowlessElement) {
     super.updated(changedProperties);
     requestAnimationFrame(() => {
       if (!this._container) return;
-      this._container.scrollTop = this._container.scrollHeight;
+      // Track max height during generation
+      if (this.state === 'generating') {
+        this._maxContainerHeight = Math.max(
+          this._maxContainerHeight,
+          this._container.scrollHeight
+        );
+        // Apply min-height to prevent shrinking
+        this._container.style.minHeight = `${this._maxContainerHeight}px`;
+      }
     });
   }
 

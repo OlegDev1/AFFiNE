@@ -15,7 +15,6 @@ import { registerHandlers } from './handlers';
 import { logger } from './logger';
 import { registerProtocol } from './protocol';
 import { isOnline } from './ui';
-import { registerUpdater } from './updater';
 import { launch } from './windows-manager/launcher';
 import { launchStage } from './windows-manager/stage';
 
@@ -87,7 +86,6 @@ app
   .then(registerEvents)
   .then(launch)
   .then(createApplicationMenu)
-  .then(registerUpdater)
   .catch(e => console.error('Failed create window:', e));
 
 if (process.env.SENTRY_RELEASE) {

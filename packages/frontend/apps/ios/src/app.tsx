@@ -40,7 +40,6 @@ import {
   titleMiddleware,
 } from '@blocksuite/affine/blocks';
 import { Container } from '@blocksuite/affine/global/di';
-import { Transformer } from '@blocksuite/affine/store';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Haptics } from '@capacitor/haptics';
@@ -107,15 +106,40 @@ framework.impl(ValidatorProvider, {
   },
 });
 framework.impl(VirtualKeyboardProvider, {
-  addEventListener: (event, callback) => {
-    Keyboard.addListener(event as any, callback as any).catch(e => {
-      console.error(e);
-    });
-  },
-  removeAllListeners: () => {
-    Keyboard.removeAllListeners().catch(e => {
-      console.error(e);
-    });
+  // We dose not provide show and hide because:
+  // - Keyboard.show() is not implemented
+  // - Keyboard.hide() will blur the current editor
+  onChange: callback => {
+    let disposeRef = {
+      dispose: () => {},
+    };
+
+    Promise.all([
+      Keyboard.addListener('keyboardDidShow', info => {
+        callback({
+          visible: true,
+          height: info.keyboardHeight,
+        });
+      }),
+      Keyboard.addListener('keyboardWillHide', () => {
+        callback({
+          visible: false,
+          height: 0,
+        });
+      }),
+    ])
+      .then(handlers => {
+        disposeRef.dispose = () => {
+          Promise.all(handlers.map(handler => handler.remove())).catch(
+            console.error
+          );
+        };
+      })
+      .catch(console.error);
+
+    return () => {
+      disposeRef.dispose();
+    };
   },
 });
 framework.impl(NavigationGestureProvider, {
@@ -223,19 +247,10 @@ const frameworkProvider = framework.provider();
   try {
     const blockSuiteDoc = doc.blockSuiteDoc;
 
-    const transformer = new Transformer({
-      schema: blockSuiteDoc.workspace.schema,
-      blobCRUD: blockSuiteDoc.workspace.blobSync,
-      docCRUD: {
-        create: (id: string) => blockSuiteDoc.workspace.createDoc({ id }),
-        get: (id: string) => blockSuiteDoc.workspace.getDoc(id),
-        delete: (id: string) => blockSuiteDoc.workspace.removeDoc(id),
-      },
-      middlewares: [
-        docLinkBaseURLMiddleware(blockSuiteDoc.workspace.id),
-        titleMiddleware(blockSuiteDoc.workspace.meta.docMetas),
-      ],
-    });
+    const transformer = blockSuiteDoc.getTransformer([
+      docLinkBaseURLMiddleware(blockSuiteDoc.workspace.id),
+      titleMiddleware(blockSuiteDoc.workspace.meta.docMetas),
+    ]);
     const snapshot = transformer.docToSnapshot(blockSuiteDoc);
 
     const container = new Container();
