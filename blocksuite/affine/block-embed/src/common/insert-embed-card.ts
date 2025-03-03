@@ -16,7 +16,7 @@ import {
 import { GfxControllerIdentifier } from '@blocksuite/block-std/gfx';
 import { Bound, Vec } from '@blocksuite/global/utils';
 
-interface EmbedCardProperties {
+export interface EmbedCardProperties {
   flavour: string;
   targetStyle: EmbedCardStyle;
   props: Record<string, unknown>;
@@ -48,7 +48,12 @@ export function insertEmbedCard(
     const parent = host.doc.getParent(block.model);
     if (!parent) return;
     const index = parent.children.indexOf(block.model);
-    host.doc.addBlock(flavour as never, props, parent, index + 1);
+    host.doc.addBlock(
+      flavour as never,
+      { ...props, style: targetStyle },
+      parent,
+      index + 1
+    );
   } else {
     const rootId = std.store.root?.id;
     if (!rootId) return;

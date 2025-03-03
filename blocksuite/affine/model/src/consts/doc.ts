@@ -4,6 +4,11 @@ export type DocMode = 'edgeless' | 'page';
 
 export const DocModes = ['edgeless', 'page'] as const;
 
+export enum DocModesEnum {
+  Edgeless = 'edgeless',
+  Page = 'page',
+}
+
 export type FootNoteReferenceType = 'doc' | 'attachment' | 'url';
 
 export const FootNoteReferenceTypes = ['doc', 'attachment', 'url'] as const;

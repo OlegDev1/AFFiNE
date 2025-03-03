@@ -2,6 +2,7 @@ export * from './connector.js';
 export * from './doc.js';
 export * from './image.js';
 export * from './line.js';
+export * from './linked-doc.js';
 export * from './mindmap.js';
 export * from './note.js';
 export * from './shape.js';

@@ -6,6 +6,7 @@ import {
   DEFAULT_ROUGHNESS,
   DefaultTheme,
   EdgelessTextZodSchema,
+  EmbedLinkedDocZodSchema,
   FontFamily,
   FontFamilySchema,
   FontStyle,
@@ -166,6 +167,7 @@ export const NodePropsSchema = z.object({
   'affine:edgeless-text': EdgelessTextZodSchema,
   'affine:note': NoteZodSchema,
   'affine:frame': FrameZodSchema,
+  'affine:embed-linked-doc': EmbedLinkedDocZodSchema,
   // shapes
   'shape:diamond': ShapeSchema,
   'shape:ellipse': ShapeSchema,

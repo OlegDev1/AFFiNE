@@ -4,6 +4,7 @@ import { useI18n } from '@affine/i18n';
 import { ConnectorSettings } from './connector';
 import { FrameSettings } from './frame';
 import { GeneralEdgelessSetting } from './general';
+import { LinkedDoc } from './linked-doc';
 import { MindMapSettings } from './mind-map';
 import { NoteSettings } from './note';
 import { PenSettings } from './pen';
@@ -22,6 +23,7 @@ export const Edgeless = () => {
       <ConnectorSettings />
       <PenSettings />
       <MindMapSettings />
+      <LinkedDoc />
     </SettingWrapper>
   );
 };
